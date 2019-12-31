@@ -1,5 +1,7 @@
 use crate::chunk::Chunk;
 use crate::error::Error;
+use alloc::boxed::Box;
+use alloc::string::String;
 
 pub(crate) struct ChunkList<'a> {
     head: Link<'a>,
@@ -12,7 +14,7 @@ struct Node<'a> {
 }
 
 impl<'a> ChunkList<'a> {
-    pub fn new(original_content: &'a [u8]) -> Self {
+    pub fn new(original_content: &'a str) -> Self {
         ChunkList {
             head: Some(Box::new(Node {
                 elem: Chunk::new(original_content),
@@ -36,11 +38,11 @@ impl<'a> ChunkList<'a> {
             }
 
             let inner_start = index - chunk.start;
-            let orig_right = chunk.right.as_ref().map(|_| Vec::new());
+            let orig_right = chunk.right.as_ref().map(|_| String::new());
             let right = chunk.right.take();
             let new_chunk = Chunk {
                 // Left is None if Chunk does not have a right.
-                left: right.as_ref().map(|_| Vec::new()),
+                left: right.as_ref().map(|_| String::new()),
                 right,
                 content: chunk.content.as_ref().map(|c| &c[inner_start..]),
                 start: index,
@@ -61,8 +63,6 @@ impl<'a> ChunkList<'a> {
             Err(Error::IndexOutOfBoundError(index))
         }
     }
-
-    //    pub fn overwrite(&mut self, start: usize, end: usize, content: &[u8]) -> Result<(), Error> {}
 
     pub fn remove(&mut self, start: usize, end: usize) -> Result<(), Error> {
         if start >= end {

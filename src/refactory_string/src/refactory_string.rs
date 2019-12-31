@@ -1,46 +1,80 @@
 use crate::error::Error;
-use crate::RefactoryBuffer;
+use crate::chunk_list::ChunkList;
+use alloc::string::String;
 
 /// A RefactoryBuffer specialization that only accepts and returns UTF-8 strings. This is
 /// what should be used when modifying a source string/file content. It uses RefactoryBuffer
 /// and converts everything conveniently.
-pub struct RefactoryString<'a>(RefactoryBuffer<'a>);
+pub struct RefactoryString<'a> {
+    chunks: ChunkList<'a>
+}
 
 impl<'a> RefactoryString<'a> {
     /// Create a new RefactoryString from the content. Never owns the original content, but
     /// owns every changes made to it.
     pub fn new(content: &'a str) -> RefactoryString<'a> {
-        RefactoryString(RefactoryBuffer::new(content.as_bytes()))
+        RefactoryString {
+            chunks:ChunkList::new(content)
+        }
     }
 
     /// The original length of the content it contains.
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.chunks.iter().fold(0, |a,x| a + x.len())
     }
 
     /// Serialize the changes to a string.
-    pub fn to_string(&self) -> Result<String, Error> {
-        return String::from_utf8(self.0.to_bytes()?).map_err(|_| Error::InvalidInternalState);
+    pub fn to_string(&self) -> String {
+        let mut s = String::new();
+        for it in self.chunks.iter() {
+            s.push_str(&it.to_string());
+        }
+        s
+    }
+
+    #[inline]
+    fn do_insert(
+        &mut self,
+        index: usize,
+        content: &str,
+        left: bool,
+        append: bool,
+    ) -> Result<(), Error> {
+        let (l, r) = self.chunks.split(index)?;
+
+        if append {
+            if left {
+                l.append_right(content)
+            } else {
+                r.append_left(content)
+            }
+        } else {
+            if left {
+                l.prepend_right(content)
+            } else {
+                r.prepend_left(content)
+            }
+        }
     }
 
     /// Append the content to the left of the index.
     pub fn append_left(&mut self, index: usize, content: &str) -> Result<(), Error> {
-        self.0.append_left(index, content.as_bytes())
+        self.do_insert(index, content, true, true)
     }
 
     /// Prepend the content to the left of the index.
     pub fn prepend_left(&mut self, index: usize, content: &str) -> Result<(), Error> {
-        self.0.prepend_left(index, content.as_bytes())
+        self.do_insert(index, content, true, false)
     }
 
     /// Append the content to the right of the index.
     pub fn append_right(&mut self, index: usize, content: &str) -> Result<(), Error> {
-        self.0.append_right(index, content.as_bytes())
+        self.do_insert(index, content, false, true)
     }
 
     /// Prepend the content to the right of the index.
     pub fn prepend_right(&mut self, index: usize, content: &str) -> Result<(), Error> {
-        self.0.prepend_right(index, content.as_bytes())
+        self.do_insert(index, content, false,false)
     }
 
     /// Prepend the content to the whole RefactoryString.
@@ -62,6 +96,6 @@ impl<'a> RefactoryString<'a> {
 
     /// Remove the content between two indices.
     pub fn remove(&mut self, start: usize, end: usize) -> Result<(), Error> {
-        self.0.remove(start, end)
+        self.chunks.remove(start, end)
     }
 }

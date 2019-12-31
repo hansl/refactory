@@ -1,13 +1,17 @@
 [package]
 name = "refactory_string"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Hans Larsen <hans@larsen.online>"]
 edition = "2018"
-license = "Apache-2.0"
+
 description = "A library to modify a string using original indices. Useful for Source Code transformations."
 homepage = "https://github.com/hansl/refactory"
 repository = "https://github.com/hansl/refactory"
 documentation = "https://docs.rs/refactory_string"
+
+license = "Apache-2.0"
+license-file = "LICENSE"
 readme = "README.md"
+categories = ["no-std", "data-structures", "parsing", "text-processing"]
 keywords = ["refactor", "source", "string", "refactory", "magic"]
 include = ["Cargo.toml", "src", "README.md", "LICENSE"]
