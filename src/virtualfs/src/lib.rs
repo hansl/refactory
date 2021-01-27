@@ -1,7 +1,6 @@
 mod error;
 pub mod fs;
 mod path;
-mod traits;
 
 pub use error::Error;
 

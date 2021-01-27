@@ -7,102 +7,119 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     /// Error coming from IO operations.
     #[error("an IO error happened: {0:?}")]
-    Io(IoError),
+    Io(#[from] IoError),
+
+    #[error("Custom error: {0}")]
+    Custom(#[from] Box<dyn std::error::Error + Send + Sync>),
 
     /// Represents any error that did not have an actual type attached to it.
     /// For example, custom implementations can use this type to provide
     /// information.
-    #[error(r#"Custom error: "{0}""#)]
-    Custom(String),
+    #[error(r#"Custom error string: "{0}""#)]
+    String(String),
+}
+
+impl Error {
+    pub fn custom<E: std::error::Error + Send + Sync + 'static>(err: E) -> Self {
+        Self::Custom(Box::new(err))
+    }
+
+    pub fn get_io(&self) -> Option<&IoError> {
+        match self {
+            Error::Io(x) => Some(x),
+            _ => None,
+        }
+    }
+
+    pub fn get_custom(&self) -> Option<&dyn std::error::Error> {
+        match self {
+            Error::Custom(x) => Some(x.as_ref()),
+            _ => None,
+        }
+    }
+
+    pub fn get_string(&self) -> Option<&String> {
+        match self {
+            Error::String(ref x) => Some(x),
+            _ => None,
+        }
+    }
+}
+
+#[cfg(not(feature = "no_std"))]
+impl Into<std::io::Error> for Error {
+    fn into(self) -> std::io::Error {
+        match self {
+            Error::Io(io) => io.into(),
+            x => std::io::Error::new(std::io::ErrorKind::Other, Box::new(x)),
+        }
+    }
 }
 
 /// A symmetrical error enum to [`std::io::ErrorKind`]. Because we need to support
 /// [`no_std`], we cannot use [`std::io::Error`] directly. We thus employ this error
 /// enum, and have a From type to convert from and into a regular [`std::io::Error`]
 /// when available.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Error, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[non_exhaustive]
 pub enum IoError {
+    #[error("An OS error occured, code {0}")]
     Os(i32),
 
-    /// An entity was not found, often a file.
+    #[error("An entity was not found, often a file.")]
     NotFound,
 
-    /// The operation lacked the necessary privileges to complete.
+    #[error("The operation lacked the necessary privileges to complete.")]
     PermissionDenied,
 
-    /// The connection was refused by the remote server.
+    #[error("The connection was refused by the remote server.")]
     ConnectionRefused,
 
-    /// The connection was reset by the remote server.
+    #[error("The connection was reset by the remote server.")]
     ConnectionReset,
 
-    /// The connection was aborted (terminated) by the remote server.
+    #[error("The connection was aborted (terminated) by the remote server.")]
     ConnectionAborted,
 
-    /// The network operation failed because it was not connected yet.
+    #[error("The network operation failed because it was not connected yet.")]
     NotConnected,
 
-    /// A socket address could not be bound because the address is already in
-    /// use elsewhere.
+    #[error(
+        "A socket address could not be bound because the address is already in use elsewhere."
+    )]
     AddrInUse,
 
-    /// A nonexistent interface was requested or the requested address was not
-    /// local.
+    #[error("A nonexistent interface was requested or the requested address was not local.")]
     AddrNotAvailable,
 
-    /// The operation failed because a pipe was closed.
+    #[error("The operation failed because a pipe was closed.")]
     BrokenPipe,
 
-    /// An entity already exists, often a file.
+    #[error("An entity already exists, often a file.")]
     AlreadyExists,
 
-    /// The operation needs to block to complete, but the blocking operation was
-    /// requested to not occur.
+    #[error("The operation needs to block to complete, but the blocking operation was requested to not occur.")]
     WouldBlock,
 
-    /// A parameter was incorrect.
+    #[error("A parameter was incorrect.")]
     InvalidInput,
 
-    /// Data not valid for the operation were encountered.
-    ///
-    /// Unlike [`InvalidInput`], this typically means that the operation
-    /// parameters were valid, however the error was caused by malformed
-    /// input data.
-    ///
-    /// For example, a function that reads a file into a string will error with
-    /// `InvalidData` if the file's contents are not valid UTF-8.
-    ///
-    /// [`InvalidInput`]: #variant.InvalidInput
+    #[error("Data not valid for the operation were encountered.")]
     InvalidData,
 
-    /// The I/O operation's timeout expired, causing it to be canceled.
+    #[error("The I/O operation's timeout expired, causing it to be canceled.")]
     TimedOut,
 
-    /// An error returned when an operation could not be completed because a
-    /// call to [`write`] returned [`Ok(0)`].
-    ///
-    /// This typically means that an operation could only succeed if it wrote a
-    /// particular number of bytes but only a smaller number of bytes could be
-    /// written.
-    ///
-    /// [`write`]: ../../std/io/trait.Write.html#tymethod.write
-    /// [`Ok(0)`]: ../../std/io/type.Result.html
+    #[error("An error returned when an operation could not be completed because a call to write returned Ok(0).")]
     WriteZero,
 
-    /// This operation was interrupted.
-    ///
-    /// Interrupted operations can typically be retried.
+    #[error("This operation was interrupted.")]
     Interrupted,
 
-    /// Any I/O error not part of this list.
+    #[error("Any I/O error not part of this list.")]
     Other,
 
-    /// An error returned when an operation could not be completed because an
-    /// "end of file" was reached prematurely.
-    ///
-    /// This typically means that an operation could only succeed if it read a
-    /// particular number of bytes but only a smaller number of bytes could be
-    /// read.
+    #[error(r#"An error returned when an operation could not be completed because an"end of file" was reached prematurely."#)]
     UnexpectedEof,
 }
 
@@ -133,6 +150,38 @@ impl From<std::io::Error> for IoError {
                 std::io::ErrorKind::UnexpectedEof => IoError::UnexpectedEof,
                 x => unreachable!("Unknown std::io::ErrorKind: {:?}", x),
             }
+        }
+    }
+}
+
+#[cfg(not(feature = "no_std"))]
+impl Into<std::io::Error> for IoError {
+    fn into(self) -> std::io::Error {
+        match self {
+            IoError::Os(code) => std::io::Error::from_raw_os_error(code),
+
+            IoError::NotFound => std::io::Error::from(std::io::ErrorKind::NotFound),
+            IoError::PermissionDenied => std::io::Error::from(std::io::ErrorKind::PermissionDenied),
+            IoError::ConnectionRefused => {
+                std::io::Error::from(std::io::ErrorKind::ConnectionRefused)
+            }
+            IoError::ConnectionReset => std::io::Error::from(std::io::ErrorKind::ConnectionReset),
+            IoError::ConnectionAborted => {
+                std::io::Error::from(std::io::ErrorKind::ConnectionAborted)
+            }
+            IoError::NotConnected => std::io::Error::from(std::io::ErrorKind::NotConnected),
+            IoError::AddrInUse => std::io::Error::from(std::io::ErrorKind::AddrInUse),
+            IoError::AddrNotAvailable => std::io::Error::from(std::io::ErrorKind::AddrNotAvailable),
+            IoError::BrokenPipe => std::io::Error::from(std::io::ErrorKind::BrokenPipe),
+            IoError::AlreadyExists => std::io::Error::from(std::io::ErrorKind::AlreadyExists),
+            IoError::WouldBlock => std::io::Error::from(std::io::ErrorKind::WouldBlock),
+            IoError::InvalidInput => std::io::Error::from(std::io::ErrorKind::InvalidInput),
+            IoError::InvalidData => std::io::Error::from(std::io::ErrorKind::InvalidData),
+            IoError::TimedOut => std::io::Error::from(std::io::ErrorKind::TimedOut),
+            IoError::WriteZero => std::io::Error::from(std::io::ErrorKind::WriteZero),
+            IoError::Interrupted => std::io::Error::from(std::io::ErrorKind::Interrupted),
+            IoError::Other => std::io::Error::from(std::io::ErrorKind::Other),
+            IoError::UnexpectedEof => std::io::Error::from(std::io::ErrorKind::UnexpectedEof),
         }
     }
 }
