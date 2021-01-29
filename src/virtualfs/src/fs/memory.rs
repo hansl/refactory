@@ -94,13 +94,6 @@ impl MemFsEntry {
         }
     }
 
-    pub fn take_content(self) -> MemFsResult<Vec<u8>> {
-        match self.kind {
-            MemFsEntryKind::File { content } => Ok(content),
-            _ => Err(expected_a_file()),
-        }
-    }
-
     pub fn set_or_replace_entry(&mut self, name: String, entry: MemFsEntry) -> MemFsResult<()> {
         match &mut self.kind {
             MemFsEntryKind::Directory { entries } => {
