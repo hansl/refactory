@@ -40,11 +40,11 @@ impl<'a, Fs: FileSystem> std::io::Read for Entry<'a, Fs> {
 pub trait FileSystem: Send + Sized {
     fn read<P: AsRef<Path>>(&self, path: P) -> Result<&[u8]>;
     fn exists<P: AsRef<Path>>(&self, path: P) -> bool;
-    fn delete<P: AsRef<Path>>(&mut self, path: P) -> Result<()>;
-    fn rename<From: AsRef<Path>, To: AsRef<Path>>(&self, from: From, to: To) -> Result<()>;
     // fn stat<P: AsRef<Path>>(&self, path: P) -> Result<Stat<'_, Self>>;
 
     fn write<P: AsRef<Path>, C: AsRef<[u8]>>(&mut self, path: P, content: C) -> Result<()>;
+    fn delete<P: AsRef<Path>>(&mut self, path: P) -> Result<()>;
+    fn rename<From: AsRef<Path>, To: AsRef<Path>>(&mut self, from: From, to: To) -> Result<()>;
 
     fn entry<P: AsRef<Path>>(&self, path: P) -> Result<Entry<'_, Self>> {
         Ok(Entry::new(self, path))
